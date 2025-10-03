@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler';
 import { setupWebSocket } from './websocket/handlers';
+import gamesRouter from './routes/games';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -34,13 +35,18 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// API Routes will go here
+// API Routes
 app.get('/api', (req, res) => {
   res.json({ message: 'Twin up! API Server', version: '1.0.0' });
 });
 
+app.use('/api/games', gamesRouter);
+
 // WebSocket setup
 setupWebSocket(io);
+
+// Make io available to routes via app.locals
+app.locals.io = io;
 
 // Error handling middleware (must be last)
 app.use(errorHandler);
