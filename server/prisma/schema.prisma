@@ -1,0 +1,123 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum GameStatus {
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+}
+
+enum TeamType {
+  GOOD
+  EVIL
+}
+
+enum RoundStatus {
+  SETUP
+  PROMPTING
+  GENERATING
+  VOTING
+  COMPLETE
+}
+
+// Models
+model Game {
+  id           String      @id @default(uuid())
+  code         String      @unique
+  hostName     String
+  status       GameStatus  @default(WAITING)
+  currentRound Int         @default(0)
+  totalRounds  Int         @default(5)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  expiresAt    DateTime
+
+  players Player[]
+  rounds  Round[]
+
+  @@index([code])
+  @@index([status])
+}
+
+model Player {
+  id       String   @id @default(uuid())
+  gameId   String
+  name     String
+  team     TeamType
+  score    Int      @default(0)
+  isHost   Boolean  @default(false)
+  joinedAt DateTime @default(now())
+
+  game        Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+  votes       Vote[]
+
+  @@index([gameId])
+  @@index([gameId, team])
+}
+
+model Round {
+  id                String       @id @default(uuid())
+  gameId            String
+  roundNumber       Int
+  referenceImageUrl String
+  referencePrompt   String
+  goodPlayerId      String?
+  evilPlayerId      String?
+  status            RoundStatus  @default(SETUP)
+  startedAt         DateTime?
+  endedAt           DateTime?
+  winningTeam       TeamType?
+  createdAt         DateTime     @default(now())
+
+  game        Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+  votes       Vote[]
+
+  @@unique([gameId, roundNumber])
+  @@index([gameId])
+  @@index([status])
+}
+
+model Submission {
+  id          String    @id @default(uuid())
+  roundId     String
+  playerId    String
+  team        TeamType
+  prompt      String
+  imageUrl    String?
+  generatedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  round  Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, team])
+  @@index([roundId])
+  @@index([playerId])
+}
+
+model Vote {
+  id         String   @id @default(uuid())
+  roundId    String
+  playerId   String
+  votedTeam  TeamType
+  createdAt  DateTime @default(now())
+
+  round  Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([roundId, playerId])
+  @@index([roundId])
+}
