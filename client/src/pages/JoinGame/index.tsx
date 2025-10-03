@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { joinGame as apiJoinGame } from '../../services/api';
 import { useGame } from '../../contexts/GameContext';
 import { useWebSocket } from '../../contexts/WebSocketContext';
+import GamePlay from '../GamePlay';
 
 export default function JoinGame() {
   const { code: urlCode } = useParams<{ code?: string }>();
@@ -44,6 +45,15 @@ export default function JoinGame() {
           playerName: response.player.name,
         })
       );
+
+      // Fetch game state after joining
+      try {
+        const { getGame } = await import('../../services/api');
+        const { game: gameData } = await getGame(gameCode);
+        setGame(gameData);
+      } catch (gameErr) {
+        console.error('Failed to fetch game state:', gameErr);
+      }
     } catch (err: any) {
       console.error('Failed to join game:', err);
       setError(err.response?.data?.error?.message || 'Failed to join game');
@@ -52,8 +62,14 @@ export default function JoinGame() {
     }
   };
 
-  // If player already joined, show waiting room
+  // If player already joined, check game status
   if (player && game) {
+    // Show gameplay screen if game is in progress
+    if (game.status === 'IN_PROGRESS' || game.status === 'COMPLETE') {
+      return <GamePlay />;
+    }
+
+    // Show waiting room for WAITING status
     const goodPlayers = game.players?.filter((p) => p.team === 'GOOD') || [];
     const evilPlayers = game.players?.filter((p) => p.team === 'EVIL') || [];
 

@@ -12,20 +12,24 @@ export default function WaitingRoom() {
   const goodPlayers = game.players?.filter((p) => p.team === 'GOOD') || [];
   const evilPlayers = game.players?.filter((p) => p.team === 'EVIL') || [];
   const totalPlayers = (game.players?.length || 0);
-  const canStart = totalPlayers >= 4 && goodPlayers.length > 0 && evilPlayers.length > 0;
+  const canStart = totalPlayers >= 2 && goodPlayers.length > 0 && evilPlayers.length > 0;
 
   const handleStartGame = async () => {
     if (!canStart) return;
 
+    console.log('[WaitingRoom] Starting game:', game.code);
     setError('');
     setStarting(true);
 
     try {
-      await apiStartGame(game.code);
+      console.log('[WaitingRoom] Calling API startGame...');
+      const result = await apiStartGame(game.code);
+      console.log('[WaitingRoom] Start game response:', result);
       // Game state will update via WebSocket
     } catch (err: any) {
-      console.error('Failed to start game:', err);
-      setError(err.response?.data?.error?.message || 'Failed to start game');
+      console.error('[WaitingRoom] Failed to start game:', err);
+      console.error('[WaitingRoom] Error details:', err.response?.data || err.message);
+      setError(err.response?.data?.error?.message || err.message || 'Failed to start game');
       setStarting(false);
     }
   };
@@ -42,7 +46,14 @@ export default function WaitingRoom() {
             Game Code: <span className="text-yellow-300">{game.code}</span>
           </h1>
           <p className="text-purple-200 text-lg">
-            Players can join at: <span className="font-mono bg-white/20 px-3 py-1 rounded">{joinUrl}</span>
+            Players can join at: <a
+              href={joinUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono bg-white/20 px-3 py-1 rounded hover:bg-white/30 transition-colors underline"
+            >
+              {joinUrl}
+            </a>
           </p>
         </div>
 
@@ -113,9 +124,9 @@ export default function WaitingRoom() {
         </div>
 
         {/* Status Messages */}
-        {totalPlayers < 4 && (
+        {totalPlayers < 2 && (
           <div className="bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 px-4 py-3 rounded-lg mb-4 text-center">
-            ⏳ Waiting for at least 4 players to join... ({totalPlayers}/4)
+            ⏳ Waiting for at least 2 players to join... ({totalPlayers}/2)
           </div>
         )}
 

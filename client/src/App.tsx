@@ -4,6 +4,7 @@ import { GameProvider } from './contexts/GameContext';
 import Home from './pages/Home';
 import HostDashboard from './pages/HostDashboard';
 import JoinGame from './pages/JoinGame';
+import GamePlay from './pages/GamePlay';
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/host" element={<HostDashboard />} />
               <Route path="/join/:code?" element={<JoinGame />} />
+              <Route path="/play" element={<GamePlay />} />
             </Routes>
           </div>
         </GameProvider>

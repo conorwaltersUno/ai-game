@@ -55,4 +55,34 @@ export async function deleteGame(code: string) {
   return response.data;
 }
 
+/**
+ * Get round by ID
+ */
+export async function getRound(roundId: string) {
+  const response = await api.get(`/rounds/${roundId}`);
+  return response.data;
+}
+
+/**
+ * Submit a prompt for a round
+ */
+export async function submitPrompt(roundId: string, playerId: string, prompt: string) {
+  const response = await api.post(`/rounds/${roundId}/submit`, {
+    playerId,
+    prompt,
+  });
+  return response.data;
+}
+
+/**
+ * Submit a vote for a round
+ */
+export async function submitVote(roundId: string, playerId: string, votedTeam: 'GOOD' | 'EVIL') {
+  const response = await api.post(`/rounds/${roundId}/vote`, {
+    playerId,
+    votedTeam,
+  });
+  return response.data;
+}
+
 export default api;

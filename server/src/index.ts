@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { errorHandler } from './middleware/errorHandler';
 import { setupWebSocket } from './websocket/handlers';
 import gamesRouter from './routes/games';
+import roundsRouter from './routes/rounds';
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
@@ -31,16 +32,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // API Routes
-app.get('/api', (req, res) => {
+app.get('/api', (_req, res) => {
   res.json({ message: 'Twin up! API Server', version: '1.0.0' });
 });
 
 app.use('/api/games', gamesRouter);
+app.use('/api/rounds', roundsRouter);
 
 // WebSocket setup
 setupWebSocket(io);
@@ -48,13 +50,19 @@ setupWebSocket(io);
 // Make io available to routes via app.locals
 app.locals.io = io;
 
+// Also make io available globally for services that need to broadcast
+// (This is a workaround to avoid circular dependencies)
+(global as any).io = io;
+
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
 // Start server
-const PORT = process.env.PORT || 3001;
-httpServer.listen(PORT, () => {
+const PORT = Number(process.env.PORT) || 3001;
+const HOST = '0.0.0.0';
+httpServer.listen(PORT, HOST, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🌐 Network: http://192.168.5.10:${PORT}`);
   console.log(`🎮 WebSocket server ready`);
   console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
 });

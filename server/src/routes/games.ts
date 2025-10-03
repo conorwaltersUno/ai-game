@@ -6,7 +6,11 @@ import {
   startGame,
   deleteGame,
 } from '../services/gameService';
-import { broadcastPlayerJoined, broadcastGameUpdate } from '../websocket/handlers';
+import {
+  broadcastPlayerJoined,
+  broadcastGameUpdate,
+  broadcastRoundStarted,
+} from '../websocket/handlers';
 
 const router = Router();
 
@@ -33,6 +37,22 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         expiresAt: result.game.expiresAt,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/games/:code/rounds
+ * Get all rounds for a game (must be before /:code route)
+ */
+router.get('/:code/rounds', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { code } = req.params;
+
+    const game = await getGameByCode(code, false, true);
+
+    res.json({ rounds: game.rounds || [] });
   } catch (error) {
     next(error);
   }
@@ -95,17 +115,22 @@ router.post('/:code/start', async (req: Request, res: Response, next: NextFuncti
   try {
     const { code } = req.params;
 
-    const game = await startGame(code);
+    const result = await startGame(code);
 
-    // Broadcast game started to all players
+    // Broadcast game started and round started to all players
     const io = req.app.locals.io;
     if (io) {
-      broadcastGameUpdate(io, code, game);
+      broadcastGameUpdate(io, code, result);
+
+      // Broadcast round started
+      if (result.currentRound) {
+        broadcastRoundStarted(io, code, result.currentRound);
+      }
     }
 
     res.json({
       success: true,
-      game,
+      game: result,
     });
   } catch (error) {
     next(error);

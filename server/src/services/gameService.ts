@@ -3,6 +3,7 @@ import { generateGameCode } from '../utils/generateCode';
 import { generateQRCode, getJoinUrl } from './qrService';
 import { assignTeam } from '../utils/teamBalancer';
 import { NotFoundError, ValidationError } from '../middleware/errorHandler';
+import { createRound } from './roundService';
 
 const prisma = new PrismaClient();
 
@@ -155,8 +156,8 @@ export async function startGame(gameCode: string) {
     throw new ValidationError('Game has already started');
   }
 
-  if (!game.players || game.players.length < 4) {
-    throw new ValidationError('Need at least 4 players to start (2 per team)');
+  if (!game.players || game.players.length < 2) {
+    throw new ValidationError('Need at least 2 players to start');
   }
 
   // Check teams are balanced
@@ -179,7 +180,13 @@ export async function startGame(gameCode: string) {
     },
   });
 
-  return updatedGame;
+  // Create first round
+  const firstRound = await createRound(updatedGame.id, 1);
+
+  return {
+    ...updatedGame,
+    currentRound: firstRound,
+  };
 }
 
 /**
@@ -193,6 +200,73 @@ export async function deleteGame(gameCode: string) {
   });
 
   return { success: true };
+}
+
+/**
+ * Start next round or complete game
+ */
+export async function startNextRound(gameCode: string) {
+  const game = await getGameByCode(gameCode, true, true);
+
+  // Validate game is in progress
+  if (game.status !== GameStatus.IN_PROGRESS) {
+    throw new ValidationError('Game is not in progress');
+  }
+
+  // Check if all rounds are complete
+  if (game.currentRound >= game.totalRounds) {
+    // Game is complete
+    const updatedGame = await prisma.game.update({
+      where: { id: game.id },
+      data: {
+        status: GameStatus.COMPLETED,
+      },
+      include: {
+        players: true,
+      },
+    });
+
+    // Calculate final scores
+    const goodScore = updatedGame.players
+      .filter(p => p.team === 'GOOD')
+      .reduce((sum, p) => sum + p.score, 0);
+    const evilScore = updatedGame.players
+      .filter(p => p.team === 'EVIL')
+      .reduce((sum, p) => sum + p.score, 0);
+
+    return {
+      gameComplete: true,
+      game: updatedGame,
+      finalScores: {
+        good: goodScore,
+        evil: evilScore,
+        winner: goodScore > evilScore ? 'GOOD' : 'EVIL',
+      },
+    };
+  }
+
+  // Start next round
+  const nextRoundNumber = game.currentRound + 1;
+
+  // Update game current round
+  const updatedGame = await prisma.game.update({
+    where: { id: game.id },
+    data: {
+      currentRound: nextRoundNumber,
+    },
+    include: {
+      players: true,
+    },
+  });
+
+  // Create next round
+  const nextRound = await createRound(updatedGame.id, nextRoundNumber);
+
+  return {
+    gameComplete: false,
+    game: updatedGame,
+    round: nextRound,
+  };
 }
 
 /**

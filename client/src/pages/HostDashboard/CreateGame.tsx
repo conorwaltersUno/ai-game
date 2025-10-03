@@ -21,11 +21,16 @@ export default function CreateGame() {
       const response = await createGame(hostName, totalRounds);
       console.log('Game created:', response);
 
-      // Set game in context
-      setGame(response.game);
-
-      // Join the game via WebSocket
+      // Join the game via WebSocket as host (for viewing only, not as a player)
       joinGame(response.game.code);
+
+      // Fetch full game state with players array
+      const { getGame } = await import('../../services/api');
+      const { game: fullGame } = await getGame(response.game.code);
+
+      // Set full game state in context
+      setGame(fullGame);
+      console.log('Full game state loaded:', fullGame);
     } catch (err: any) {
       console.error('Failed to create game:', err);
       setError(err.response?.data?.error?.message || 'Failed to create game');
