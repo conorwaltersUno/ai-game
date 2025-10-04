@@ -1,0 +1,139 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ai-game-postgres
+    environment:
+      POSTGRES_DB: ai_game
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai-game-network
+
+  # ComfyUI AI Service - NOW CORE SERVICE (always starts)
+  comfyui:
+    build:
+      context: ./ai-services
+      dockerfile: Dockerfile.comfyui
+      args:
+        - DOWNLOAD_MODELS=true  # Download models on first build
+    container_name: ai-game-comfyui
+    # REMOVED profiles - now always active
+    ports:
+      - "8188:8188"
+    volumes:
+      - comfyui_models:/app/models
+      - comfyui_output:/app/output
+      - shared_images:/app/shared-images
+    # Uncomment for NVIDIA GPU support
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    environment:
+      - PYTORCH_ENABLE_MPS_FALLBACK=1
+      - COMFYUI_MODEL_CACHE=/app/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8188/system_stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s  # Extended for model loading
+    restart: unless-stopped
+    networks:
+      - ai-game-network
+
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: ai-game-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_game
+      - AI_PROVIDER=local  # CHANGED from 'mock' to 'local'
+      - COMFYUI_HOST=http://comfyui:8188
+      - PORT=3001
+      - CORS_ORIGIN=http://localhost
+      - IMAGE_URL_BASE=http://localhost:3001/images
+      - ENABLE_PARALLEL_GENERATION=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      comfyui:
+        condition: service_healthy  # ADDED - Wait for ComfyUI to be ready
+    volumes:
+      - shared_images:/app/public/generated-images
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s  # Extended - backend needs time for AI initialization
+    networks:
+      - ai-game-network
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+      args:
+        - VITE_API_URL=
+        - VITE_WS_URL=
+        - VITE_HOST_USERNAME=${VITE_HOST_USERNAME:-admin}
+        - VITE_HOST_PASSWORD=${VITE_HOST_PASSWORD:-admin123}
+    container_name: ai-game-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    volumes:
+      - shared_images:/usr/share/nginx/html/images:ro
+    networks:
+      - ai-game-network
+
+  # Cloudflare Tunnel (optional - only for production)
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ai-game-tunnel
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles:
+      - production
+    networks:
+      - ai-game-network
+
+volumes:
+  postgres_data:
+    driver: local
+  comfyui_models:
+    driver: local
+  comfyui_output:
+    driver: local
+  shared_images:
+    driver: local
+
+networks:
+  ai-game-network:
+    driver: bridge

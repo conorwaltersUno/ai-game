@@ -236,6 +236,20 @@ async function generateImagesForSubmissions(roundId: string) {
   console.log(`🎨 [Image Generation] Starting parallel generation for round ${roundId}`);
   const startTime = Date.now();
 
+  // Fetch round with game to get gameCode
+  const round = await prisma.round.findUnique({
+    where: { id: roundId },
+    include: {
+      game: true,
+    },
+  });
+
+  if (!round) {
+    throw new Error(`Round ${roundId} not found`);
+  }
+
+  const gameCode = round.game.code;
+
   const submissions = await prisma.submission.findMany({
     where: { roundId },
   });
@@ -246,10 +260,12 @@ async function generateImagesForSubmissions(roundId: string) {
     console.log(`🎨 Generating image for ${submission.team} team...`);
     console.log(`   Prompt: "${submission.prompt}"`);
 
-    // Generate image using DALL-E 3 (or mock if configured)
+    // Generate image with team and gameCode for progress tracking
     const imageUrl = await generateImage(submission.prompt, {
       quality: 'standard',  // Use 'hd' for higher quality (but slower/more expensive)
       size: '1024x1024',
+      team: submission.team,
+      gameCode: gameCode,
     });
 
     return prisma.submission.update({

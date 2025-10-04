@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 import { errorHandler } from './middleware/errorHandler';
 import { setupWebSocket } from './websocket/handlers';
 import gamesRouter from './routes/games';
@@ -14,22 +15,27 @@ dotenv.config({ path: '.env.local' });
 const app = express();
 const httpServer = createServer(app);
 
-// Initialize Socket.io
+// Initialize Socket.io with permissive CORS for game night
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: true, // Allow all origins (needed for Cloudflare tunnel and various access points)
     methods: ['GET', 'POST'],
     credentials: true,
   },
 });
 
-// Middleware
+// Middleware - Allow all origins for game night accessibility
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: true, // Allow all origins
   credentials: true,
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from public/generated-images
+const generatedImagesPath = path.join(__dirname, '../public/generated-images');
+app.use('/images', express.static(generatedImagesPath));
+console.log(`📁 Serving generated images from: ${generatedImagesPath}`);
 
 // Health check endpoint
 app.get('/api/health', (_req, res) => {

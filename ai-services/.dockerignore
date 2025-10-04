@@ -1,0 +1,46 @@
+# Ignore output files
+output/*
+temp/*
+*.png
+*.jpg
+*.jpeg
+
+# Ignore model files if they'll be downloaded
+# Comment these out if you want to include pre-downloaded models
+# models/*
+# !models/.gitkeep
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Logs
+*.log
+
+# Docker
+Dockerfile*
+.dockerignore

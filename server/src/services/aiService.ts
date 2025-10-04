@@ -1,12 +1,32 @@
 import OpenAI from 'openai';
+import { LocalAIProvider } from './providers/localAIProvider';
+import { TeamType } from '@prisma/client';
 
 const USE_MOCK_AI = process.env.USE_MOCK_AI === 'true';
+const AI_PROVIDER = process.env.AI_PROVIDER || 'openai'; // 'openai', 'local', or 'mock'
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-// Initialize OpenAI client
+// Initialize AI providers
 let openai: OpenAI | null = null;
+let localAI: LocalAIProvider | null = null;
 
-if (!USE_MOCK_AI && OPENAI_API_KEY) {
+// Determine which provider to use
+if (AI_PROVIDER === 'local') {
+  // Local AI using ComfyUI
+  const io = (global as any).io;
+  localAI = new LocalAIProvider(io);
+  console.log('🎨 Local AI Provider initialized - ComfyUI enabled');
+
+  // Check if ComfyUI is available
+  localAI.isAvailable().then(available => {
+    if (available) {
+      console.log('✅ ComfyUI connection verified');
+    } else {
+      console.warn('⚠️ ComfyUI not available - falling back to mock images');
+    }
+  });
+} else if (!USE_MOCK_AI && OPENAI_API_KEY) {
+  // OpenAI DALL-E 3
   openai = new OpenAI({
     apiKey: OPENAI_API_KEY,
   });
@@ -18,11 +38,12 @@ if (!USE_MOCK_AI && OPENAI_API_KEY) {
 }
 
 /**
- * Generate an image using DALL-E 3
+ * Generate an image using configured AI provider
  *
  * @param prompt - The text prompt for image generation
- * @param quality - Image quality: "standard" or "hd"
- * @param size - Image size: "1024x1024", "1024x1792", or "1792x1024"
+ * @param options - Generation options
+ * @param team - Team generating the image (for progress tracking)
+ * @param gameCode - Game code (for progress tracking)
  * @returns URL of the generated image
  */
 export async function generateImage(
@@ -30,11 +51,28 @@ export async function generateImage(
   options: {
     quality?: 'standard' | 'hd';
     size?: '1024x1024' | '1024x1792' | '1792x1024';
+    team?: TeamType;
+    gameCode?: string;
   } = {}
 ): Promise<string> {
-  const { quality = 'standard', size = '1024x1024' } = options;
+  const { quality = 'standard', size = '1024x1024', team, gameCode } = options;
 
-  // Use mock images if configured
+  // Route to Local AI Provider if configured
+  if (AI_PROVIDER === 'local' && localAI) {
+    try {
+      const available = await localAI.isAvailable();
+      if (available) {
+        return await localAI.generateImage(prompt, { quality, size }, team, gameCode);
+      } else {
+        console.warn('⚠️ ComfyUI not available, falling back to mock');
+      }
+    } catch (error: any) {
+      console.error('❌ Local AI generation failed:', error.message);
+      console.warn('⚠️ Falling back to mock image');
+    }
+  }
+
+  // Use mock images if configured or as fallback
   if (USE_MOCK_AI || !openai) {
     console.log(`🎨 [MOCK] Generating image for prompt: "${prompt.substring(0, 50)}..."`);
     // Return a deterministic mock image based on prompt hash

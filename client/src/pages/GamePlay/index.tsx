@@ -6,6 +6,7 @@ import Spectator from './Spectator';
 import VotingView from './VotingView';
 import RoundResults from './RoundResults';
 import FinalResults from './FinalResults';
+import ImageGenerationLoader from '../../components/ImageGenerationLoader';
 
 export default function GamePlay() {
   const { game, player, setGame } = useGame();
@@ -132,26 +133,7 @@ export default function GamePlay() {
         );
 
       case 'GENERATING':
-        return (
-          <div className="min-h-screen flex items-center justify-center p-4">
-            <div className="max-w-2xl w-full text-center">
-              <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-12 shadow-2xl border border-white/20">
-                <div className="text-8xl mb-6 animate-bounce">🎨</div>
-                <h2 className="text-4xl font-bold text-white mb-4">
-                  Generating Images...
-                </h2>
-                <p className="text-purple-200 text-xl">
-                  Our AI is creating masterpieces from the prompts!
-                </p>
-                <div className="mt-8 flex justify-center gap-2">
-                  <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
+        return <ImageGenerationLoader gameCode={game.code} />;
 
       case 'VOTING':
         return <VotingView round={currentRound} player={player} />;
