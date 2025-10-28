@@ -14,6 +14,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const pendingJoinsRef = useRef<Array<{ gameCode: string; playerId?: string }>>([]);
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const playerIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     console.log('[WebSocketContext] Initializing WebSocket connection');
@@ -40,11 +42,26 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       console.log('✅ [WebSocketContext] WebSocket connected event fired');
       setConnected(true);
 
+      // Start heartbeat mechanism (send heartbeat every 10 seconds)
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+      }
+
+      heartbeatIntervalRef.current = setInterval(() => {
+        if (playerIdRef.current && newSocket.connected) {
+          newSocket.emit('heartbeat', { playerId: playerIdRef.current });
+          console.log('💓 Heartbeat sent');
+        }
+      }, 5000); // Every 5 seconds (aggressive polling)
+
       // Process any pending join requests
       if (pendingJoinsRef.current.length > 0) {
         console.log(`🔄 [WebSocketContext] Processing ${pendingJoinsRef.current.length} pending join(s)`);
         pendingJoinsRef.current.forEach(({ gameCode, playerId }) => {
           newSocket.emit('join-game', { gameCode, playerId });
+          if (playerId) {
+            playerIdRef.current = playerId;
+          }
           console.log(`🎮 [WebSocketContext] Sent queued join-game for: ${gameCode}`);
         });
         pendingJoinsRef.current = [];
@@ -55,21 +72,47 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     const handleDisconnect = (reason: string) => {
       console.log('❌ [WebSocketContext] WebSocket disconnected:', reason);
       setConnected(false);
+
+      // Clear heartbeat interval
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
     };
 
     const handleError = (error: any) => {
-      console.error('⚠️ [WebSocketContext] WebSocket error:', error);
+      console.error('====================================');
+      console.error('⚠️ [WebSocketContext] WebSocket error');
+      console.error('====================================');
+      console.error('Error:', error);
+      console.error('Error Message:', error?.message);
+      console.error('Error Type:', error?.type);
+      console.error('Socket Connected:', newSocket.connected);
+      console.error('Socket ID:', newSocket.id);
+      console.error('====================================');
     };
 
     newSocket.on('connect', handleConnect);
     newSocket.on('disconnect', handleDisconnect);
     newSocket.on('error', handleError);
 
+    // Handle server ping - respond with pong
+    newSocket.on('ping', () => {
+      newSocket.emit('pong');
+    });
+
     return () => {
       console.log('🧹 [WebSocketContext] Cleaning up socket listeners');
       newSocket.off('connect', handleConnect);
       newSocket.off('disconnect', handleDisconnect);
       newSocket.off('error', handleError);
+      newSocket.off('ping');
+
+      // Cleanup heartbeat on unmount
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current);
+      }
+
       // Don't disconnect the socket - let it persist across component remounts
       // newSocket.disconnect();
     };
@@ -78,6 +121,10 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const joinGame = (gameCode: string, playerId?: string) => {
     console.log(`[WebSocketContext] joinGame called - gameCode: ${gameCode}, playerId: ${playerId}`);
     console.log(`[WebSocketContext] socket: ${socket?.id || 'null'}, connected: ${connected}`);
+
+    if (playerId) {
+      playerIdRef.current = playerId;
+    }
 
     if (socket && connected) {
       console.log(`🎮 [WebSocketContext] Emitting join-game event to server`);

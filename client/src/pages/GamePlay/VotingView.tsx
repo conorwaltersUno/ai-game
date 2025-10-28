@@ -13,11 +13,46 @@ export default function VotingView({ round, player }: VotingViewProps) {
   const [voted, setVoted] = useState(false);
   const [voteCounts, setVoteCounts] = useState({ good: 0, evil: 0 });
   const [error, setError] = useState('');
+  const [timeLeft, setTimeLeft] = useState(50);
 
   // Check if player already voted or is a prompt creator (host has no player object)
   const isHost = !player;
   const isPromptCreator = player ? (player.id === round.goodPlayerId || player.id === round.evilPlayerId) : false;
   const hasVoted = player ? (round.votes?.some((v: any) => v.playerId === player.id) || voted) : false;
+
+  // Debug logging
+  console.log('🗳️ [VotingView] Render:', {
+    hasPlayer: !!player,
+    playerId: player?.id,
+    isHost,
+    isPromptCreator,
+    hasVoted,
+    canVote: !isHost && !isPromptCreator && !hasVoted,
+    goodPlayerId: round.goodPlayerId,
+    evilPlayerId: round.evilPlayerId,
+  });
+
+  // 50-second countdown timer - synchronized with server
+  useEffect(() => {
+    // Calculate time left from server's voting start time
+    const votingStarted = round.imageGenerationCompletedAt || round.updatedAt || new Date();
+    const votingStartTime = new Date(votingStarted).getTime();
+    const timeElapsed = Date.now() - votingStartTime;
+    const remaining = Math.max(0, Math.ceil((50000 - timeElapsed) / 1000));
+    setTimeLeft(remaining);
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [round.id]); // Reset when round changes
 
   // Get submissions and shuffle them to randomize order
   const goodSubmission = round.submissions?.find((s: any) => s.team === 'GOOD');
@@ -91,6 +126,15 @@ export default function VotingView({ round, player }: VotingViewProps) {
             <p className="text-yellow-300 text-sm mt-2">
               🤐 Teams are anonymous - vote for the best image!
             </p>
+
+            {/* Timer */}
+            <div className={`mt-4 inline-block px-6 py-3 rounded-full font-bold text-xl ${
+              timeLeft <= 10
+                ? 'bg-red-500/30 border-2 border-red-400 text-red-200 animate-pulse'
+                : 'bg-blue-500/30 border-2 border-blue-400 text-blue-200'
+            }`}>
+              ⏱️ Time Left: {timeLeft}s
+            </div>
           </div>
 
           {/* Reference Image */}
@@ -103,6 +147,11 @@ export default function VotingView({ round, player }: VotingViewProps) {
                 src={round.referenceImageUrl}
                 alt="Reference"
                 className="rounded-xl shadow-2xl max-w-xs border-4 border-yellow-400/50"
+                onError={(e) => {
+                  console.error('❌ Reference image failed to load:', round.referenceImageUrl);
+                  const target = e.target as HTMLImageElement;
+                  target.src = 'https://picsum.photos/1024/1024?random=ref-fallback';
+                }}
               />
             </div>
           </div>
@@ -122,10 +171,17 @@ export default function VotingView({ round, player }: VotingViewProps) {
                     src={item.submission.imageUrl}
                     alt={`Submission ${item.label}`}
                     className="w-full rounded-lg shadow-xl border-4 border-white/20 mb-4"
+                    onError={(e) => {
+                      console.error(`❌ ${item.label} image failed to load:`, item.submission?.imageUrl);
+                      console.error('   Team:', item.team);
+                      console.error('   Round:', round.id);
+                      const target = e.target as HTMLImageElement;
+                      target.src = 'https://picsum.photos/1024/1024?random=vote-error';
+                    }}
                   />
                 ) : (
                   <div className="w-full h-64 bg-white/5 rounded-lg flex items-center justify-center mb-4">
-                    <span className="text-white/50">No image</span>
+                    <span className="text-white/50 animate-pulse">🎨 Loading image...</span>
                   </div>
                 )}
 
@@ -150,17 +206,30 @@ export default function VotingView({ round, player }: VotingViewProps) {
           </div>
 
           {/* Status Messages */}
-          {isPromptCreator && (
-            <div className="bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 px-4 py-3 rounded-lg text-center">
-              You created a prompt for this round, so you can't vote!
+          {isHost && (
+            <div className="bg-blue-500/20 border border-blue-500/50 text-blue-200 px-4 py-3 rounded-lg text-center">
+              👀 You're observing as the host - players are voting now!
             </div>
           )}
 
-          {hasVoted && !isPromptCreator && (
+          {isPromptCreator && !isHost && (
+            <div className="bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 px-4 py-3 rounded-lg text-center">
+              ✍️ You created a prompt for this round, so you can't vote!
+            </div>
+          )}
+
+          {hasVoted && !isPromptCreator && !isHost && (
             <div className="bg-green-500/20 border border-green-500/50 text-green-200 px-6 py-4 rounded-lg text-center">
               <div className="text-4xl mb-2">✅</div>
               <p className="text-lg font-bold">Vote Submitted!</p>
               <p className="text-sm mt-1">Waiting for other players...</p>
+            </div>
+          )}
+
+          {!isHost && !isPromptCreator && !hasVoted && (
+            <div className="bg-purple-500/20 border-2 border-purple-500/50 text-purple-200 px-6 py-4 rounded-lg text-center animate-pulse">
+              <p className="text-lg font-bold">👆 Cast your vote above!</p>
+              <p className="text-sm mt-1">Click a "Vote for" button to choose the best image</p>
             </div>
           )}
 

@@ -32,9 +32,16 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from public/generated-images
+// Serve static files from public/generated-images with proper headers for mobile
 const generatedImagesPath = path.join(__dirname, '../public/generated-images');
-app.use('/images', express.static(generatedImagesPath));
+app.use('/images', (_req, res, next) => {
+  // Add CORS and cache headers for images
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+  next();
+}, express.static(generatedImagesPath));
 console.log(`📁 Serving generated images from: ${generatedImagesPath}`);
 
 // Health check endpoint

@@ -111,12 +111,12 @@ fi
 # Build images if requested
 if [ "$BUILD" = true ]; then
     echo -e "${BLUE}🔨 Building Docker images...${NC}"
-    docker compose $PROFILE build
+    docker compose $PROFILE build backend frontend
 fi
 
-# Start services
+# Start services (excluding comfyui - use Replicate instead)
 echo -e "${GREEN}🚀 Starting services...${NC}"
-docker compose $PROFILE up -d
+docker compose $PROFILE up -d backend frontend postgres
 
 # Wait for services to be healthy
 echo ""
@@ -167,8 +167,8 @@ echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo -e "${CYAN}🎮 Frontend:${NC}  http://localhost"
 echo -e "${CYAN}🔌 Backend:${NC}   http://localhost:3001"
-echo -e "${CYAN}🎨 ComfyUI:${NC}   http://localhost:8188"
 echo -e "${CYAN}📊 Database:${NC}  postgresql://localhost:5432/ai_game"
+echo -e "${CYAN}🎨 AI Provider:${NC} Replicate (SeedDream-4)"
 echo ""
 echo -e "${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""

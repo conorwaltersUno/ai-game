@@ -34,8 +34,8 @@ export default function HostDashboard() {
     );
   }
 
-  // Show gameplay screen if game is in progress
-  if (game.status === 'IN_PROGRESS' || game.status === 'COMPLETE') {
+  // Show gameplay screen if game is in progress or completed
+  if (game.status === 'IN_PROGRESS' || game.status === 'COMPLETED') {
     return <GamePlay />;
   }
 

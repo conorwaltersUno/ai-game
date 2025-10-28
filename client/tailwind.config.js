@@ -7,15 +7,26 @@ export default {
   theme: {
     extend: {
       colors: {
+        team1: {
+          light: '#3B82F6',
+          DEFAULT: '#2563EB',
+          dark: '#1D4ED8',
+        },
+        team2: {
+          light: '#A855F7',
+          DEFAULT: '#9333EA',
+          dark: '#7E22CE',
+        },
+        // Legacy aliases for backward compatibility
         good: {
-          light: '#10B981',
-          DEFAULT: '#059669',
-          dark: '#047857',
+          light: '#3B82F6',
+          DEFAULT: '#2563EB',
+          dark: '#1D4ED8',
         },
         evil: {
-          light: '#EF4444',
-          DEFAULT: '#DC2626',
-          dark: '#B91C1C',
+          light: '#A855F7',
+          DEFAULT: '#9333EA',
+          dark: '#7E22CE',
         },
         festive: {
           gold: '#F59E0B',

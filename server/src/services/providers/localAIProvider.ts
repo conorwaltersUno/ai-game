@@ -5,7 +5,7 @@ import { TeamType } from '@prisma/client';
 
 interface ImageGenerationOptions {
   quality?: 'standard' | 'hd';
-  size?: '1024x1024' | '1024x1792' | '1792x1024';
+  size?: '512x512' | '1024x1024' | '1024x1792' | '1792x1024';
 }
 
 // Progress event structure for WebSocket emissions
@@ -33,11 +33,13 @@ export class LocalAIProvider {
   constructor(io?: any) {
     this.comfyuiHost = process.env.COMFYUI_HOST || 'http://localhost:8188';
     this.outputDir = path.join(__dirname, '../../../public/generated-images');
-    this.imageBaseUrl = process.env.IMAGE_URL_BASE || 'http://localhost:3001/images';
+    // Use relative path for mobile compatibility - works with tunnels, local network, etc.
+    this.imageBaseUrl = process.env.IMAGE_URL_BASE || '/images';
     this.io = io || (global as any).io;
     this.maxConcurrent = parseInt(process.env.MAX_CONCURRENT_GENERATIONS || '2', 10);
 
     console.log(`🎨 LocalAI initialized with max ${this.maxConcurrent} concurrent generations`);
+    console.log(`🌐 Image URL Base: ${this.imageBaseUrl} ${this.imageBaseUrl.startsWith('/') ? '(relative - mobile compatible ✅)' : '(absolute)'}`);
 
     // Ensure output directory exists
     if (!fs.existsSync(this.outputDir)) {
@@ -175,19 +177,20 @@ export class LocalAIProvider {
 
   /**
    * Create ComfyUI workflow for image generation
+   * OPTIMIZED FOR SPEED - 4-5 second generation target
    */
   private createWorkflow(prompt: string, width: number, height: number): any {
-    // Enhanced prompt with quality descriptors
-    const enhancedPrompt = this.enhancePrompt(prompt);
+    // Use prompt as-is for speed (no enhancement)
     const seed = Math.floor(Math.random() * 1000000000);
 
-    // ComfyUI workflow using SD 1.5 + LCM LoRA for fast generation
+    // ComfyUI workflow using SD 1.5 + LCM LoRA for ULTRA-FAST generation
+    // Settings optimized for speed over quality
     return {
       "3": {
         "inputs": {
           "seed": seed,
-          "steps": 4,
-          "cfg": 1.5,
+          "steps": 2,  // Reduced from 4 to 2 for speed
+          "cfg": 1.0,  // Reduced from 1.5 for faster sampling
           "sampler_name": "euler",
           "scheduler": "sgm_uniform",
           "denoise": 1,
@@ -214,14 +217,14 @@ export class LocalAIProvider {
       },
       "6": {
         "inputs": {
-          "text": enhancedPrompt,
+          "text": prompt,  // Use raw prompt for speed (no enhancement)
           "clip": ["10", 1]  // Use CLIP from LoRA loader
         },
         "class_type": "CLIPTextEncode"
       },
       "7": {
         "inputs": {
-          "text": "blurry, low quality, distorted, watermark, text, signature",
+          "text": "blurry",  // Minimal negative prompt for speed
           "clip": ["10", 1]  // Use CLIP from LoRA loader
         },
         "class_type": "CLIPTextEncode"
@@ -275,8 +278,9 @@ export class LocalAIProvider {
 
   /**
    * Wait for image generation to complete and retrieve image data
+   * Increased timeout to prevent failures during generation
    */
-  private async waitForImage(promptId: string, maxWaitTime = 60000): Promise<Buffer> {
+  private async waitForImage(promptId: string, maxWaitTime = 120000): Promise<Buffer> {
     const startTime = Date.now();
     const checkInterval = 500; // Check every 500ms
 
@@ -359,13 +363,6 @@ export class LocalAIProvider {
   private parseSize(size: string): [number, number] {
     const [w, h] = size.split('x').map(Number);
     return [w, h];
-  }
-
-  /**
-   * Enhance user prompt with quality descriptors
-   */
-  private enhancePrompt(userPrompt: string): string {
-    return `${userPrompt}. High quality, detailed, professional photography, vibrant colors, sharp focus`;
   }
 
   /**

@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import TeamBadge from '../../components/TeamBadge';
+import { useGame } from '../../contexts/GameContext';
+import GameSummary from '../HostDashboard/GameSummary';
 
 interface FinalResultsProps {
   game: any;
 }
 
 export default function FinalResults({ game }: FinalResultsProps) {
+  const { player } = useGame(); // Get player info to detect if host
   const [rounds, setRounds] = useState<any[]>([]);
 
   useEffect(() => {
@@ -24,6 +27,14 @@ export default function FinalResults({ game }: FinalResultsProps) {
       fetchRounds();
     }
   }, [game?.code]);
+
+  // Determine if current user is host (no player object means host)
+  const isHost = !player;
+
+  // Show host-specific summary if user is host
+  if (isHost) {
+    return <GameSummary game={game} rounds={rounds} />;
+  }
 
   // Calculate team scores
   const goodPlayers = game.players?.filter((p: any) => p.team === 'GOOD') || [];
@@ -48,7 +59,7 @@ export default function FinalResults({ game }: FinalResultsProps) {
                   <TeamBadge team={overallWinner as any} size="lg" />
                 </div>
                 <p className="text-3xl font-bold text-white">
-                  {overallWinner === 'GOOD' ? 'Good' : 'Evil'} Team Wins!
+                  {overallWinner === 'GOOD' ? 'Team 1' : 'Team 2'} Wins!
                 </p>
               </>
             ) : (
@@ -59,20 +70,20 @@ export default function FinalResults({ game }: FinalResultsProps) {
           {/* Final Scores */}
           <div className="grid grid-cols-2 gap-6 mb-12">
             <div className={`rounded-xl p-6 text-center border-4 ${
-              overallWinner === 'GOOD' ? 'bg-good/30 border-good' : 'bg-good/10 border-good/30'
+              overallWinner === 'GOOD' ? 'bg-team1/30 border-team1' : 'bg-team1/10 border-team1/30'
             }`}>
               <TeamBadge team="GOOD" size="lg" />
               <p className="text-5xl font-bold text-white mt-4">{goodScore}</p>
-              <p className="text-green-200 mt-2">Final Score</p>
+              <p className="text-blue-200 mt-2">Final Score</p>
               {overallWinner === 'GOOD' && <div className="text-6xl mt-4">👑</div>}
             </div>
 
             <div className={`rounded-xl p-6 text-center border-4 ${
-              overallWinner === 'EVIL' ? 'bg-evil/30 border-evil' : 'bg-evil/10 border-evil/30'
+              overallWinner === 'EVIL' ? 'bg-team2/30 border-team2' : 'bg-team2/10 border-team2/30'
             }`}>
               <TeamBadge team="EVIL" size="lg" />
               <p className="text-5xl font-bold text-white mt-4">{evilScore}</p>
-              <p className="text-red-200 mt-2">Final Score</p>
+              <p className="text-purple-200 mt-2">Final Score</p>
               {overallWinner === 'EVIL' && <div className="text-6xl mt-4">👑</div>}
             </div>
           </div>
@@ -166,9 +177,9 @@ export default function FinalResults({ game }: FinalResultsProps) {
                         </div>
                         <img
                           src={goodSubmission?.imageUrl}
-                          alt="Good team"
+                          alt="Team 1"
                           className={`rounded-xl shadow-lg w-full border-4 ${
-                            round.winningTeam === 'GOOD' ? 'border-good shadow-good/50' : 'border-good/30'
+                            round.winningTeam === 'GOOD' ? 'border-team1 shadow-team1/50' : 'border-team1/30'
                           }`}
                         />
                         <div className="mt-2 bg-white/10 rounded-lg p-3">
@@ -178,15 +189,15 @@ export default function FinalResults({ game }: FinalResultsProps) {
                         </div>
                         <div className={`mt-2 px-4 py-2 rounded-lg font-bold ${
                           round.winningTeam === 'GOOD'
-                            ? 'bg-green-500/30 text-green-200'
-                            : 'bg-red-500/30 text-red-200'
+                            ? 'bg-blue-500/30 text-blue-200'
+                            : 'bg-gray-500/30 text-gray-200'
                         }`}>
                           {goodVotes} vote{goodVotes !== 1 ? 's' : ''}
                           {round.winningTeam === 'GOOD' ? ' ✓' : ''}
                         </div>
                       </div>
 
-                      {/* Evil Submission */}
+                      {/* Team 2 Submission */}
                       <div className="text-center">
                         <div className="mb-2">
                           <div className="flex items-center justify-center gap-2 mb-1">
@@ -199,9 +210,9 @@ export default function FinalResults({ game }: FinalResultsProps) {
                         </div>
                         <img
                           src={evilSubmission?.imageUrl}
-                          alt="Evil team"
+                          alt="Team 2"
                           className={`rounded-xl shadow-lg w-full border-4 ${
-                            round.winningTeam === 'EVIL' ? 'border-evil shadow-evil/50' : 'border-evil/30'
+                            round.winningTeam === 'EVIL' ? 'border-team2 shadow-team2/50' : 'border-team2/30'
                           }`}
                         />
                         <div className="mt-2 bg-white/10 rounded-lg p-3">
@@ -211,8 +222,8 @@ export default function FinalResults({ game }: FinalResultsProps) {
                         </div>
                         <div className={`mt-2 px-4 py-2 rounded-lg font-bold ${
                           round.winningTeam === 'EVIL'
-                            ? 'bg-green-500/30 text-green-200'
-                            : 'bg-red-500/30 text-red-200'
+                            ? 'bg-purple-500/30 text-purple-200'
+                            : 'bg-gray-500/30 text-gray-200'
                         }`}>
                           {evilVotes} vote{evilVotes !== 1 ? 's' : ''}
                           {round.winningTeam === 'EVIL' ? ' ✓' : ''}

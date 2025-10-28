@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "5435:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -66,19 +66,29 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_game
-      - AI_PROVIDER=local  # CHANGED from 'mock' to 'local'
-      - COMFYUI_HOST=http://comfyui:8188
+      - AI_PROVIDER=${AI_PROVIDER:-local}  # Options: 'local', 'replicate', 'openai', 'mock'
       - PORT=3001
       - CORS_ORIGIN=http://localhost
-      - IMAGE_URL_BASE=http://localhost:3001/images
+      - IMAGE_URL_BASE=/images
       - ENABLE_PARALLEL_GENERATION=true
+      # Prompt Enhancement (GPT-4o-mini)
+      - ENABLE_PROMPT_ENHANCEMENT=${ENABLE_PROMPT_ENHANCEMENT:-true}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Local AI (ComfyUI/SD 1.5) - Only used if AI_PROVIDER=local
+      - COMFYUI_HOST=http://comfyui:8188
+      # Replicate (SeedDream-4) - Only used if AI_PROVIDER=replicate
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN:-}
+      - REPLICATE_MODEL=${REPLICATE_MODEL:-bytedance/seedream-4}
+      # SeedDream-4 Settings (Lower = Faster & Cheaper)
+      - SEEDREAM_GUIDANCE=${SEEDREAM_GUIDANCE:-5.0}
+      - SEEDREAM_NUM_STEPS=${SEEDREAM_NUM_STEPS:-25}
     depends_on:
       postgres:
         condition: service_healthy
-      comfyui:
-        condition: service_healthy  # ADDED - Wait for ComfyUI to be ready
+      # comfyui:
+      #   condition: service_healthy  # Only needed if AI_PROVIDER=local
     volumes:
-      - shared_images:/app/public/generated-images
+      - shared_images:/app/server/public/generated-images
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
       interval: 10s

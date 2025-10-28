@@ -8,6 +8,15 @@ interface SpectatorProps {
 }
 
 export default function Spectator({ round, game, player }: SpectatorProps) {
+  // CRITICAL DEBUG
+  console.log('🔍 [Spectator] Rendering with round:', {
+    roundId: round?.id,
+    roundNumber: round?.roundNumber,
+    referenceImageUrl: round?.referenceImageUrl || '❌ MISSING!!!',
+    status: round?.status,
+    hasRound: !!round,
+  });
+
   const isHost = !player;
   // Calculate team scores
   const goodScore = game.players?.filter((p: any) => p.team === 'GOOD').reduce((sum: number, p: any) => sum + p.score, 0) || 0;
@@ -30,15 +39,15 @@ export default function Spectator({ round, game, player }: SpectatorProps) {
 
           {/* Team Scores */}
           <div className="grid grid-cols-2 gap-4 mb-8">
-            <div className="bg-good/30 border-2 border-good rounded-xl p-4 text-center">
-              <div className="text-good-light text-sm font-bold mb-1">🦸 GOOD TEAM</div>
+            <div className="bg-team1/30 border-2 border-team1 rounded-xl p-4 text-center">
+              <div className="text-team1-light text-sm font-bold mb-1">TEAM 1</div>
               <div className="text-white text-5xl font-bold">{goodScore}</div>
-              <div className="text-green-200 text-xs mt-1">points</div>
+              <div className="text-blue-200 text-xs mt-1">points</div>
             </div>
-            <div className="bg-evil/30 border-2 border-evil rounded-xl p-4 text-center">
-              <div className="text-evil-light text-sm font-bold mb-1">😈 EVIL TEAM</div>
+            <div className="bg-team2/30 border-2 border-team2 rounded-xl p-4 text-center">
+              <div className="text-team2-light text-sm font-bold mb-1">TEAM 2</div>
               <div className="text-white text-5xl font-bold">{evilScore}</div>
-              <div className="text-red-200 text-xs mt-1">points</div>
+              <div className="text-purple-200 text-xs mt-1">points</div>
             </div>
           </div>
 
@@ -48,11 +57,26 @@ export default function Spectator({ round, game, player }: SpectatorProps) {
               📸 Reference Image
             </h3>
             <div className="flex justify-center">
-              <img
-                src={round.referenceImageUrl}
-                alt="Reference"
-                className="rounded-xl shadow-2xl max-w-md w-full border-4 border-white/30"
-              />
+              {round.referenceImageUrl ? (
+                <img
+                  src={round.referenceImageUrl}
+                  alt="Reference"
+                  className="rounded-xl shadow-2xl max-w-md w-full border-4 border-white/30"
+                  onError={(e) => {
+                    console.error('❌ Reference image failed to load:', round.referenceImageUrl);
+                    // Replace with fallback image
+                    const target = e.target as HTMLImageElement;
+                    target.src = 'https://picsum.photos/512/512?random=fallback';
+                  }}
+                />
+              ) : (
+                <div className="rounded-xl shadow-2xl max-w-md w-full border-4 border-white/30 bg-gray-700 flex items-center justify-center h-64">
+                  <div className="text-center text-white">
+                    <div className="text-4xl mb-2 animate-pulse">🎨</div>
+                    <p>Loading reference image...</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -62,32 +86,32 @@ export default function Spectator({ round, game, player }: SpectatorProps) {
               Battle in Progress
             </h3>
             <div className="grid grid-cols-2 gap-4">
-              {/* Good Team */}
-              <div className="bg-good/20 border-2 border-good rounded-xl p-4 text-center">
+              {/* Team 1 */}
+              <div className="bg-team1/20 border-2 border-team1 rounded-xl p-4 text-center">
                 <TeamBadge team="GOOD" size="md" />
                 <p className="text-white font-bold text-lg mt-2">
-                  Good Team
+                  Team 1
                 </p>
-                <div className="text-green-200 text-sm mt-1 animate-pulse">
+                <div className="text-blue-200 text-sm mt-1 animate-pulse">
                   ✍️ Writing prompt...
                 </div>
               </div>
 
-              {/* Evil Team */}
-              <div className="bg-evil/20 border-2 border-evil rounded-xl p-4 text-center">
+              {/* Team 2 */}
+              <div className="bg-team2/20 border-2 border-team2 rounded-xl p-4 text-center">
                 <TeamBadge team="EVIL" size="md" />
                 <p className="text-white font-bold text-lg mt-2">
-                  Evil Team
+                  Team 2
                 </p>
-                <div className="text-red-200 text-sm mt-1 animate-pulse">
+                <div className="text-purple-200 text-sm mt-1 animate-pulse">
                   ✍️ Writing prompt...
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Timer */}
-          <Timer seconds={30} className="mb-8" />
+          {/* Timer - Server-synced */}
+          <Timer deadline={round.promptingDeadline} className="mb-8" />
 
           {/* Spectator Message */}
           <div className="text-center text-purple-200">

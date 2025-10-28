@@ -1,22 +1,31 @@
 import axios from 'axios';
 import type { Game, Player } from '@shared/types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Use relative URL if VITE_API_URL is not set (for production with tunnel)
+// Otherwise use the provided URL (for local development)
+const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
+
+console.log('[API Service] Initializing with API_URL:', API_URL);
+console.log('[API Service] VITE_API_URL:', import.meta.env.VITE_API_URL);
+console.log('[API Service] Window Origin:', window.location.origin);
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },
+  // Add timeout to help diagnose network issues
+  timeout: 30000,
 });
 
 /**
  * Create a new game
  */
-export async function createGame(hostName: string, totalRounds: number = 5) {
+export async function createGame(hostName: string, totalRounds: number = 5, gameMode: 'standard' | 'everyone' = 'standard') {
   const response = await api.post('/games', {
     hostName,
     totalRounds,
+    gameMode,
   });
   return response.data;
 }

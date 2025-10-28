@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { submitPrompt as apiSubmitPrompt } from '../../services/api';
+import { useWebSocket } from '../../contexts/WebSocketContext';
+import { useGame } from '../../contexts/GameContext';
 import Timer from '../../components/Timer';
 import TeamBadge from '../../components/TeamBadge';
 
@@ -9,6 +11,17 @@ interface PromptInputProps {
 }
 
 export default function PromptInput({ round, player }: PromptInputProps) {
+  // CRITICAL DEBUG
+  console.log('🔍 [PromptInput] Rendering with round:', {
+    roundId: round?.id,
+    roundNumber: round?.roundNumber,
+    referenceImageUrl: round?.referenceImageUrl || '❌ MISSING!!!',
+    status: round?.status,
+    hasRound: !!round,
+  });
+
+  const { socket } = useWebSocket();
+  const { game } = useGame();
   const [prompt, setPrompt] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -35,7 +48,20 @@ export default function PromptInput({ round, player }: PromptInputProps) {
   };
 
   const handleTimeout = () => {
+    console.log('⏰ Timer expired - handling timeout');
+
+    // Emit timeout event to server for auto-complete logic
+    if (socket && game) {
+      console.log('📡 Emitting round:prompt-timeout event');
+      socket.emit('round:prompt-timeout', {
+        roundId: round.id,
+        gameCode: game.code,
+      });
+    }
+
+    // If player has typed something but hasn't submitted, auto-submit
     if (!hasSubmitted && prompt.trim()) {
+      console.log('📤 Auto-submitting prompt on timeout');
       handleSubmit(new Event('submit') as any);
     }
   };
@@ -63,16 +89,31 @@ export default function PromptInput({ round, player }: PromptInputProps) {
               📸 Reference Image
             </h3>
             <div className="flex justify-center">
-              <img
-                src={round.referenceImageUrl}
-                alt="Reference"
-                className="rounded-xl shadow-2xl max-w-md w-full border-4 border-white/30"
-              />
+              {round.referenceImageUrl ? (
+                <img
+                  src={round.referenceImageUrl}
+                  alt="Reference"
+                  className="rounded-xl shadow-2xl max-w-md w-full border-4 border-white/30"
+                  onError={(e) => {
+                    console.error('❌ Reference image failed to load:', round.referenceImageUrl);
+                    // Replace with fallback image
+                    const target = e.target as HTMLImageElement;
+                    target.src = 'https://picsum.photos/512/512?random=fallback';
+                  }}
+                />
+              ) : (
+                <div className="rounded-xl shadow-2xl max-w-md w-full border-4 border-white/30 bg-gray-700 flex items-center justify-center h-64">
+                  <div className="text-center text-white">
+                    <div className="text-4xl mb-2 animate-pulse">🎨</div>
+                    <p>Loading reference image...</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Timer */}
-          {!hasSubmitted && <Timer seconds={30} onComplete={handleTimeout} className="mb-8" />}
+          {/* Timer - Server-synced */}
+          {!hasSubmitted && <Timer deadline={round.promptingDeadline} onComplete={handleTimeout} className="mb-8" />}
 
           {/* Prompt Input Form */}
           {!hasSubmitted ? (

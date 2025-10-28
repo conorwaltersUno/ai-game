@@ -13,7 +13,7 @@ export default function JoinGame() {
   const [error, setError] = useState('');
 
   const { game, player, setGame, setPlayer } = useGame();
-  const { joinGame: wsJoinGame } = useWebSocket();
+  const { joinGame: wsJoinGame, socket } = useWebSocket();
 
   useEffect(() => {
     if (urlCode) {
@@ -21,14 +21,46 @@ export default function JoinGame() {
     }
   }, [urlCode]);
 
+  // Handle tab close/navigation - immediately notify server
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (player && socket && game) {
+        console.log('👋 [BeforeUnload] Player leaving, notifying server');
+        // Try to notify server of intentional disconnect
+        socket.emit('player-leaving', {
+          playerId: player.id,
+          gameCode: game.code
+        });
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [player, socket, game]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
+    console.log('====================================');
+    console.log('🎮 JOIN GAME ATTEMPT');
+    console.log('====================================');
+    console.log('Game Code:', gameCode);
+    console.log('Player Name:', playerName);
+    console.log('User Agent:', navigator.userAgent);
+    console.log('Window Origin:', window.location.origin);
+    console.log('API URL:', import.meta.env.VITE_API_URL || 'http://localhost:3001');
+    console.log('WS URL:', import.meta.env.VITE_WS_URL || 'http://localhost:3001');
+    console.log('====================================');
+
     try {
+      console.log('📡 Calling API to join game...');
       const response = await apiJoinGame(gameCode, playerName);
-      console.log('Joined game:', response);
+      console.log('✅ API Response:', response);
 
       // Set player in context
       setPlayer(response.player);
@@ -55,8 +87,24 @@ export default function JoinGame() {
         console.error('Failed to fetch game state:', gameErr);
       }
     } catch (err: any) {
-      console.error('Failed to join game:', err);
-      setError(err.response?.data?.error?.message || 'Failed to join game');
+      console.error('====================================');
+      console.error('❌ JOIN GAME FAILED');
+      console.error('====================================');
+      console.error('Error:', err);
+      console.error('Error Message:', err.message);
+      console.error('Response Status:', err.response?.status);
+      console.error('Response Data:', err.response?.data);
+      console.error('Network Error:', err.code);
+      console.error('Is Network Error:', !err.response);
+      console.error('====================================');
+
+      let errorMessage = 'Failed to join game';
+      if (!err.response) {
+        errorMessage = 'Network error - Cannot reach server. Please check your internet connection.';
+      } else {
+        errorMessage = err.response?.data?.error?.message || err.message || 'Failed to join game';
+      }
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -83,10 +131,10 @@ export default function JoinGame() {
               </h1>
               <div className={`inline-block px-6 py-3 rounded-full text-xl font-bold ${
                 player.team === 'GOOD'
-                  ? 'bg-good text-white'
-                  : 'bg-evil text-white'
+                  ? 'bg-team1 text-white'
+                  : 'bg-team2 text-white'
               }`}>
-                {player.team === 'GOOD' ? '🦸 Good Team' : '😈 Evil Team'}
+                {player.team === 'GOOD' ? 'Team 1' : 'Team 2'}
               </div>
               <p className="text-purple-200 mt-4">
                 Game Code: <span className="font-mono text-yellow-300 text-2xl">{game.code}</span>
@@ -100,13 +148,13 @@ export default function JoinGame() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h4 className="text-good-light font-bold mb-2">🦸 Good Team ({goodPlayers.length})</h4>
+                  <h4 className="text-team1-light font-bold mb-2">Team 1 ({goodPlayers.length})</h4>
                   <div className="space-y-1">
                     {goodPlayers.map((p) => (
                       <div
                         key={p.id}
                         className={`text-sm px-3 py-1 rounded ${
-                          p.id === player.id ? 'bg-good text-white font-bold' : 'text-green-200'
+                          p.id === player.id ? 'bg-team1 text-white font-bold' : 'text-blue-200'
                         }`}
                       >
                         {p.name} {p.isHost && '👑'}
@@ -116,13 +164,13 @@ export default function JoinGame() {
                 </div>
 
                 <div>
-                  <h4 className="text-evil-light font-bold mb-2">😈 Evil Team ({evilPlayers.length})</h4>
+                  <h4 className="text-team2-light font-bold mb-2">Team 2 ({evilPlayers.length})</h4>
                   <div className="space-y-1">
                     {evilPlayers.map((p) => (
                       <div
                         key={p.id}
                         className={`text-sm px-3 py-1 rounded ${
-                          p.id === player.id ? 'bg-evil text-white font-bold' : 'text-red-200'
+                          p.id === player.id ? 'bg-team2 text-white font-bold' : 'text-purple-200'
                         }`}
                       >
                         {p.name} {p.isHost && '👑'}
@@ -137,6 +185,8 @@ export default function JoinGame() {
               <div className="animate-pulse text-2xl mb-2">⏳</div>
               <p>Waiting for the host to start the game...</p>
               <p className="text-sm mt-2">Total Players: {game.players?.length || 0}</p>
+              <p className="text-xs mt-2 font-mono opacity-70">Status: {game.status}</p>
+              <p className="text-xs font-mono opacity-70">Round: {typeof game.currentRound === 'object' ? (game.currentRound as any)?.roundNumber : game.currentRound || 0}</p>
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@ import {
   addPlayerToGame,
   startGame,
   deleteGame,
+  resetGameToLobby,
 } from '../services/gameService';
 import {
   broadcastPlayerJoined,
@@ -20,9 +21,9 @@ const router = Router();
  */
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { hostName, totalRounds } = req.body;
+    const { hostName, totalRounds, gameMode } = req.body;
 
-    const result = await createGame(hostName, totalRounds);
+    const result = await createGame(hostName, totalRounds, gameMode);
 
     res.status(201).json({
       game: {
@@ -30,6 +31,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         code: result.game.code,
         hostName: result.game.hostName,
         totalRounds: result.game.totalRounds,
+        gameMode: result.game.gameMode,
         status: result.game.status,
         qrCodeUrl: result.qrCodeUrl,
         joinUrl: result.joinUrl,
@@ -83,7 +85,19 @@ router.post('/:code/join', async (req: Request, res: Response, next: NextFunctio
     const { code } = req.params;
     const { playerName } = req.body;
 
+    console.log('====================================');
+    console.log('🎮 JOIN GAME REQUEST RECEIVED');
+    console.log('====================================');
+    console.log('Game Code:', code);
+    console.log('Player Name:', playerName);
+    console.log('IP Address:', req.ip || req.connection.remoteAddress);
+    console.log('User Agent:', req.headers['user-agent']);
+    console.log('Origin:', req.headers.origin);
+    console.log('Referer:', req.headers.referer);
+    console.log('====================================');
+
     const player = await addPlayerToGame(code, playerName);
+    console.log('✅ Player added successfully:', { playerId: player.id, team: player.team });
 
     // Broadcast to all players that someone joined
     const io = req.app.locals.io;
@@ -132,6 +146,22 @@ router.post('/:code/start', async (req: Request, res: Response, next: NextFuncti
       success: true,
       game: result,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/games/:code/reset
+ * Reset game to lobby (host only, after game completion)
+ */
+router.post('/:code/reset', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { code } = req.params;
+
+    const game = await resetGameToLobby(code);
+
+    res.json({ success: true, game });
   } catch (error) {
     next(error);
   }

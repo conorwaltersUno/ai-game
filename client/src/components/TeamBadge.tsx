@@ -14,11 +14,11 @@ export default function TeamBadge({ team, size = 'md' }: TeamBadgeProps) {
     <span
       className={`inline-block rounded-full font-bold ${sizeClasses[size]} ${
         team === 'GOOD'
-          ? 'bg-good text-white'
-          : 'bg-evil text-white'
+          ? 'bg-team1 text-white'
+          : 'bg-team2 text-white'
       }`}
     >
-      {team === 'GOOD' ? '🦸 Good' : '😈 Evil'}
+      {team === 'GOOD' ? 'Team 1' : 'Team 2'}
     </span>
   );
 }

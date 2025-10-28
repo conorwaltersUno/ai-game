@@ -18,6 +18,11 @@ enum GameStatus {
   EXPIRED
 }
 
+enum GameMode {
+  STANDARD
+  EVERYONE_PLAYS
+}
+
 enum TeamType {
   GOOD
   EVIL
@@ -31,12 +36,26 @@ enum RoundStatus {
   COMPLETE
 }
 
+enum ImageStatus {
+  PENDING
+  GENERATING
+  COMPLETED
+  FAILED
+}
+
+enum ConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+  REMOVED
+}
+
 // Models
 model Game {
   id           String      @id @default(uuid())
   code         String      @unique
   hostName     String
   status       GameStatus  @default(WAITING)
+  gameMode     GameMode    @default(STANDARD)
   currentRound Int         @default(0)
   totalRounds  Int         @default(5)
   createdAt    DateTime    @default(now())
@@ -51,13 +70,20 @@ model Game {
 }
 
 model Player {
-  id       String   @id @default(uuid())
-  gameId   String
-  name     String
-  team     TeamType
-  score    Int      @default(0)
-  isHost   Boolean  @default(false)
-  joinedAt DateTime @default(now())
+  id          String   @id @default(uuid())
+  gameId      String
+  name        String
+  team        TeamType
+  score       Int      @default(0)
+  isHost      Boolean  @default(false)
+  joinedAt    DateTime @default(now())
+  timesPlayed Int      @default(0) // Track how many rounds this player has participated in
+
+  // Connection tracking
+  socketId         String?
+  lastHeartbeat    DateTime?
+  connectionStatus ConnectionStatus  @default(CONNECTED)
+  disconnectedAt   DateTime?
 
   game        Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
   submissions Submission[]
@@ -65,6 +91,8 @@ model Player {
 
   @@index([gameId])
   @@index([gameId, team])
+  @@index([connectionStatus])
+  @@index([lastHeartbeat])
 }
 
 model Round {
@@ -79,7 +107,17 @@ model Round {
   startedAt         DateTime?
   endedAt           DateTime?
   winningTeam       TeamType?
+  promptingDeadline DateTime?    // When prompting phase should end (30s from start)
+  autoCompleted     Boolean      @default(false) // Track if auto-completed due to timeout
   createdAt         DateTime     @default(now())
+
+  // Image safety tracking
+  referenceImageStatus          ImageStatus @default(PENDING)
+  referenceImageError           String?
+  referenceImageAttempts        Int         @default(0)
+  allImagesReady                Boolean     @default(false)
+  imageGenerationStartedAt      DateTime?
+  imageGenerationCompletedAt    DateTime?
 
   game        Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
   submissions Submission[]
@@ -98,7 +136,13 @@ model Submission {
   prompt      String
   imageUrl    String?
   generatedAt DateTime?
+  submittedAt DateTime  @default(now()) // Track when prompt was submitted
   createdAt   DateTime  @default(now())
+
+  // Image generation safety tracking
+  imageStatus        ImageStatus @default(PENDING)
+  imageError         String?
+  generationAttempts Int         @default(0)
 
   round  Round  @relation(fields: [roundId], references: [id], onDelete: Cascade)
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
@@ -106,6 +150,7 @@ model Submission {
   @@unique([roundId, team])
   @@index([roundId])
   @@index([playerId])
+  @@index([imageStatus])
 }
 
 model Vote {

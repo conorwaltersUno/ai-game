@@ -41,9 +41,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     const handleGameUpdated = ({ game: updatedGame }: { game: Game }) => {
       console.log('📡 [GameContext] Received game:updated event');
+      console.log('   Current status:', game?.status || 'none');
+      console.log('   Updated status:', updatedGame.status);
       console.log('   Current players:', game?.players?.length || 0);
       console.log('   Updated players:', updatedGame.players?.length || 0);
-      setGame(updatedGame);
+      console.log('   Current round:', game?.currentRound || 'none');
+      console.log('   Updated round:', updatedGame.currentRound || 'none');
+
+      // Force a new object reference to ensure React detects the change
+      setGame({ ...updatedGame });
       console.log('✅ [GameContext] State updated after game:updated');
     };
 

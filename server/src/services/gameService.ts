@@ -1,4 +1,4 @@
-import { PrismaClient, GameStatus } from '@prisma/client';
+import { PrismaClient, GameStatus, GameMode } from '@prisma/client';
 import { generateGameCode } from '../utils/generateCode';
 import { generateQRCode, getJoinUrl } from './qrService';
 import { assignTeam } from '../utils/teamBalancer';
@@ -10,15 +10,23 @@ const prisma = new PrismaClient();
 /**
  * Create a new game
  */
-export async function createGame(hostName: string, totalRounds: number = 5) {
+export async function createGame(
+  hostName: string,
+  totalRounds: number = 5,
+  gameMode: 'standard' | 'everyone' = 'standard'
+) {
   // Validate input
   if (!hostName || hostName.trim().length === 0) {
     throw new ValidationError('Host name is required');
   }
 
-  if (totalRounds < 1 || totalRounds > 10) {
+  // For standard mode, validate rounds
+  if (gameMode === 'standard' && (totalRounds < 1 || totalRounds > 10)) {
     throw new ValidationError('Total rounds must be between 1 and 10');
   }
+
+  // For everyone plays mode, rounds will be calculated when game starts
+  const prismaGameMode = gameMode === 'everyone' ? GameMode.EVERYONE_PLAYS : GameMode.STANDARD;
 
   // Generate unique game code
   let gameCode = generateGameCode();
@@ -48,7 +56,8 @@ export async function createGame(hostName: string, totalRounds: number = 5) {
     data: {
       code: gameCode,
       hostName: hostName.trim(),
-      totalRounds,
+      totalRounds: prismaGameMode === GameMode.EVERYONE_PLAYS ? 1 : totalRounds, // Placeholder for everyone mode
+      gameMode: prismaGameMode,
       expiresAt,
       status: GameStatus.WAITING,
     },
@@ -67,12 +76,19 @@ export async function createGame(hostName: string, totalRounds: number = 5) {
 
 /**
  * Get game by code with optional includes
+ * IMPORTANT: Only returns CONNECTED players (filters out disconnected/removed)
  */
 export async function getGameByCode(code: string, includePlayers = false, includeRounds = false) {
   const game = await prisma.game.findUnique({
     where: { code: code.toUpperCase() },
     include: {
-      players: includePlayers,
+      players: includePlayers
+        ? {
+            where: {
+              connectionStatus: 'CONNECTED', // Only include active players
+            },
+          }
+        : false,
       rounds: includeRounds
         ? {
             include: {
@@ -168,15 +184,30 @@ export async function startGame(gameCode: string) {
     throw new ValidationError('Each team must have at least one player');
   }
 
+  // Calculate total rounds for EVERYONE_PLAYS mode
+  let totalRounds = game.totalRounds;
+  if (game.gameMode === GameMode.EVERYONE_PLAYS) {
+    // Each round has 2 players (1 GOOD, 1 EVIL)
+    // So we need ceil(playerCount / 2) rounds to ensure everyone plays at least once
+    const playerCount = game.players.length;
+    totalRounds = Math.ceil(playerCount / 2);
+    console.log(`🎮 [Everyone Plays Mode] ${playerCount} players → ${totalRounds} rounds`);
+  }
+
   // Update game status
   const updatedGame = await prisma.game.update({
     where: { id: game.id },
     data: {
       status: GameStatus.IN_PROGRESS,
       currentRound: 1,
+      totalRounds, // Update with calculated rounds for everyone mode
     },
     include: {
-      players: true,
+      players: {
+        where: {
+          connectionStatus: 'CONNECTED', // Only include active players
+        },
+      },
     },
   });
 
@@ -222,7 +253,11 @@ export async function startNextRound(gameCode: string) {
         status: GameStatus.COMPLETED,
       },
       include: {
-        players: true,
+        players: {
+          where: {
+            connectionStatus: 'CONNECTED', // Only include active players
+          },
+        },
       },
     });
 
@@ -255,7 +290,11 @@ export async function startNextRound(gameCode: string) {
       currentRound: nextRoundNumber,
     },
     include: {
-      players: true,
+      players: {
+        where: {
+          connectionStatus: 'CONNECTED', // Only include active players
+        },
+      },
     },
   });
 
@@ -267,6 +306,50 @@ export async function startNextRound(gameCode: string) {
     game: updatedGame,
     round: nextRound,
   };
+}
+
+/**
+ * Reset game to WAITING state without clearing players
+ * Allows host to start a new game with same lobby
+ */
+export async function resetGameToLobby(gameCode: string) {
+  const game = await getGameByCode(gameCode, true);
+
+  // Can only reset completed games
+  if (game.status !== GameStatus.COMPLETED) {
+    throw new ValidationError('Can only reset completed games');
+  }
+
+  // Reset all player scores
+  await prisma.player.updateMany({
+    where: { gameId: game.id },
+    data: { score: 0 },
+  });
+
+  // Delete all rounds for this game
+  await prisma.round.deleteMany({
+    where: { gameId: game.id },
+  });
+
+  // Reset game to WAITING status
+  const updatedGame = await prisma.game.update({
+    where: { id: game.id },
+    data: {
+      status: GameStatus.WAITING,
+      currentRound: 0,
+    },
+    include: {
+      players: {
+        where: {
+          connectionStatus: 'CONNECTED', // Only include active players
+        },
+      },
+    },
+  });
+
+  console.log(`🔄 Game ${gameCode} reset to WAITING - ${updatedGame.players.length} active players retained`);
+
+  return updatedGame;
 }
 
 /**

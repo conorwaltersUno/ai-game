@@ -1,4 +1,4 @@
-.PHONY: help start stop restart build logs clean dev prod tunnel status health test db-reset
+.PHONY: help start stop restart build logs clean dev prod tunnel status health test db-reset start-local start-tunnel show-url
 
 # Default target - show help
 help:
@@ -6,6 +6,12 @@ help:
 	@echo "🎮 AI Game - Available Commands"
 	@echo "════════════════════════════════════════════════════════════════"
 	@echo ""
+	@echo "  🚀 QUICK START:"
+	@echo "  make start-local        - Start game on local network only"
+	@echo "  make start-tunnel       - Start game with PUBLIC URL (share with anyone!)"
+	@echo "  make show-url           - Display the current public tunnel URL"
+	@echo ""
+	@echo "  📦 SERVICE MANAGEMENT:"
 	@echo "  make start              - Start services in local mode"
 	@echo "  make dev                - Start services in development mode (alias for start)"
 	@echo "  make tunnel             - Start with free public URL (recommended for game night)"
@@ -14,21 +20,83 @@ help:
 	@echo "  make rebuild            - Rebuild and start services"
 	@echo "  make rebuild-tunnel     - Rebuild and start with public URL"
 	@echo ""
+	@echo "  🛑 CONTROL:"
 	@echo "  make stop               - Stop all services"
 	@echo "  make restart            - Restart all services"
 	@echo "  make clean              - Stop and remove all containers, volumes, and networks"
 	@echo ""
+	@echo "  📜 MONITORING:"
 	@echo "  make logs               - View all service logs"
 	@echo "  make logs-backend       - View backend logs only"
 	@echo "  make logs-frontend      - View frontend logs only"
 	@echo "  make logs-db            - View database logs only"
 	@echo ""
+	@echo "  🔍 INFO:"
 	@echo "  make status             - Show status of all services"
 	@echo "  make health             - Check health of all services"
 	@echo "  make db-reset           - Reset database (caution: deletes all data)"
 	@echo ""
 	@echo "════════════════════════════════════════════════════════════════"
 	@echo ""
+
+# ═══════════════════════════════════════════════════════════════
+# 🚀 MAIN COMMANDS (Recommended)
+# ═══════════════════════════════════════════════════════════════
+
+# Start locally (localhost only - no public URL)
+start-local:
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo "🏠 Starting game in LOCAL MODE"
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo ""
+	@./start.sh
+	@echo ""
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo "✅ Game running locally!"
+	@echo "═══════════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "📍 Access the game at:"
+	@echo "   🌐 http://localhost"
+	@echo ""
+	@echo "💡 Only devices on your local network can access this."
+	@echo "💡 To share with external players, use: make start-tunnel"
+	@echo ""
+
+# Start with public URL (accessible from anywhere!)
+start-tunnel:
+	@./quick-start-tunnel.sh
+
+# Show the public tunnel URL (if running)
+show-url:
+	@echo ""
+	@if docker ps | grep -q ai-game-quick-tunnel; then \
+		TUNNEL_URL=$$(docker logs ai-game-quick-tunnel 2>&1 | grep -oE "https://[a-z0-9-]+\.trycloudflare\.com" | head -n 1); \
+		if [ -n "$$TUNNEL_URL" ]; then \
+			echo "═══════════════════════════════════════════════════════════════"; \
+			echo "🌐 Your Public Game URL:"; \
+			echo "═══════════════════════════════════════════════════════════════"; \
+			echo ""; \
+			echo "   $$TUNNEL_URL"; \
+			echo ""; \
+			echo "═══════════════════════════════════════════════════════════════"; \
+			echo ""; \
+			echo "🎮 Host dashboard:  $$TUNNEL_URL/host"; \
+			echo "👥 Join game:       $$TUNNEL_URL/join/GAMECODE"; \
+			echo ""; \
+		else \
+			echo "⏳ Tunnel is starting... please wait a few seconds and try again."; \
+			echo ""; \
+		fi; \
+	else \
+		echo "❌ Tunnel is not running. Start it with:"; \
+		echo "   make start-tunnel"; \
+		echo ""; \
+	fi
+
+# ═══════════════════════════════════════════════════════════════
+# 📦 SERVICE MANAGEMENT (Legacy commands)
+# ═══════════════════════════════════════════════════════════════
 
 # Start services in local mode (default)
 start:
@@ -73,14 +141,17 @@ stop:
 # Restart services
 restart: stop start
 
-# Clean everything (containers, volumes, networks)
+# Clean everything (containers, volumes, networks, images)
 clean:
 	@echo "🧹 Cleaning up all Docker resources..."
 	@docker compose down -v
 	@docker stop ai-game-quick-tunnel 2>/dev/null || true
 	@docker rm ai-game-quick-tunnel 2>/dev/null || true
+	@echo "🗑️  Removing Docker images..."
+	@docker rmi ai-game-backend ai-game-frontend ai-game-comfyui 2>/dev/null || true
+	@docker images | grep ai-game | awk '{print $$3}' | xargs docker rmi -f 2>/dev/null || true
 	@docker system prune -f
-	@echo "✅ Cleanup complete!"
+	@echo "✅ Cleanup complete! All images, containers, and volumes removed."
 
 # View all logs
 logs:

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useGame } from '../../contexts/GameContext';
 import { startGame as apiStartGame } from '../../services/api';
 
@@ -57,41 +58,42 @@ export default function WaitingRoom() {
           </p>
         </div>
 
-        {/* QR Code Placeholder - Will add QR generation later */}
+        {/* QR Code */}
         <div className="flex justify-center mb-8">
           <div className="bg-white/20 backdrop-blur p-6 rounded-xl border border-white/30">
-            <div className="text-center text-white">
-              <div className="text-6xl mb-2">📱</div>
-              <p className="text-sm">Scan QR code to join</p>
-              <p className="text-xs text-purple-200 mt-1">(QR generation coming soon)</p>
+            <div className="text-center">
+              <div className="bg-white p-4 rounded-lg inline-block mb-3">
+                <QRCodeSVG value={joinUrl} size={200} level="H" />
+              </div>
+              <p className="text-sm text-white">Scan QR code to join</p>
             </div>
           </div>
         </div>
 
         {/* Player Count */}
         <div className="grid grid-cols-2 gap-4 mb-8">
-          <div className="bg-good/20 border-2 border-good rounded-xl p-6 text-center">
-            <h3 className="text-2xl font-bold text-good-light mb-2">Good Team</h3>
+          <div className="bg-team1/20 border-2 border-team1 rounded-xl p-6 text-center">
+            <h3 className="text-2xl font-bold text-team1-light mb-2">Team 1</h3>
             <p className="text-4xl font-bold text-white">{goodPlayers.length}</p>
-            <p className="text-sm text-green-200 mt-2">players</p>
+            <p className="text-sm text-blue-200 mt-2">players</p>
           </div>
-          <div className="bg-evil/20 border-2 border-evil rounded-xl p-6 text-center">
-            <h3 className="text-2xl font-bold text-evil-light mb-2">Evil Team</h3>
+          <div className="bg-team2/20 border-2 border-team2 rounded-xl p-6 text-center">
+            <h3 className="text-2xl font-bold text-team2-light mb-2">Team 2</h3>
             <p className="text-4xl font-bold text-white">{evilPlayers.length}</p>
-            <p className="text-sm text-red-200 mt-2">players</p>
+            <p className="text-sm text-purple-200 mt-2">players</p>
           </div>
         </div>
 
         {/* Players List */}
         <div className="grid grid-cols-2 gap-4 mb-8">
-          {/* Good Team */}
+          {/* Team 1 */}
           <div>
-            <h4 className="text-good-light font-bold mb-3 text-lg">🦸 Good Team</h4>
+            <h4 className="text-team1-light font-bold mb-3 text-lg">Team 1</h4>
             <div className="space-y-2">
               {goodPlayers.map((player) => (
                 <div
                   key={player.id}
-                  className="bg-good/30 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+                  className="bg-team1/30 text-white px-4 py-2 rounded-lg flex items-center gap-2"
                 >
                   {player.isHost && <span>👑</span>}
                   <span>{player.name}</span>
@@ -103,14 +105,14 @@ export default function WaitingRoom() {
             </div>
           </div>
 
-          {/* Evil Team */}
+          {/* Team 2 */}
           <div>
-            <h4 className="text-evil-light font-bold mb-3 text-lg">😈 Evil Team</h4>
+            <h4 className="text-team2-light font-bold mb-3 text-lg">Team 2</h4>
             <div className="space-y-2">
               {evilPlayers.map((player) => (
                 <div
                   key={player.id}
-                  className="bg-evil/30 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+                  className="bg-team2/30 text-white px-4 py-2 rounded-lg flex items-center gap-2"
                 >
                   {player.isHost && <span>👑</span>}
                   <span>{player.name}</span>

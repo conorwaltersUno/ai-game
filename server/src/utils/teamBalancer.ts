@@ -33,12 +33,15 @@ export function getTeamCounts(players: Player[]): { good: number; evil: number }
 
 /**
  * Select random player from each team for a round
+ * Prioritizes players who haven't played yet (timesPlayed = 0)
+ * Then prioritizes players who have played the least
  * Excludes recently selected players if provided
  */
 export function selectRoundPlayers(
   players: Player[],
   recentlySelected: string[] = []
 ): { goodPlayerId: string; evilPlayerId: string } | null {
+  // Filter by team and exclude recently selected
   const goodPlayers = players.filter(
     (p: any) => p.team === TeamType.GOOD && !recentlySelected.includes(p.id)
   );
@@ -51,11 +54,29 @@ export function selectRoundPlayers(
     return null;
   }
 
-  const goodPlayer = goodPlayers[Math.floor(Math.random() * goodPlayers.length)];
-  const evilPlayer = evilPlayers[Math.floor(Math.random() * evilPlayers.length)];
+  // Helper function to select player with fewest plays
+  const selectPlayer = (teamPlayers: any[]) => {
+    // Sort by timesPlayed (ascending), then randomize within same play count
+    const sorted = teamPlayers.sort((a, b) => {
+      if (a.timesPlayed !== b.timesPlayed) {
+        return a.timesPlayed - b.timesPlayed;
+      }
+      return Math.random() - 0.5; // Random if equal
+    });
+
+    // Get all players with the minimum play count
+    const minPlays = sorted[0].timesPlayed;
+    const leastPlayedPlayers = sorted.filter(p => p.timesPlayed === minPlays);
+
+    // Randomly select from players with least plays
+    return leastPlayedPlayers[Math.floor(Math.random() * leastPlayedPlayers.length)];
+  };
+
+  const goodPlayer = selectPlayer(goodPlayers);
+  const evilPlayer = selectPlayer(evilPlayers);
 
   return {
-    goodPlayerId: (goodPlayer as any).id,
-    evilPlayerId: (evilPlayer as any).id,
+    goodPlayerId: goodPlayer.id,
+    evilPlayerId: evilPlayer.id,
   };
 }
